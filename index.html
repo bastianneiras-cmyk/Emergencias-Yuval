@@ -28,9 +28,14 @@
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
+html{min-height:100%}
+/* Columna flexible de alto completo: con poco contenido el pie queda pegado
+   abajo en vez de aparecer a media pantalla, y con mucho contenido baja
+   normalmente al final. */
 body{font-family:"Inter","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   background:var(--papel); color:var(--tinta); font-size:16px; line-height:1.45;
-  -webkit-text-size-adjust:100%}
+  -webkit-text-size-adjust:100%;
+  min-height:100vh; display:flex; flex-direction:column}
 .oculto{display:none !important}
 .tenue{color:var(--tinta-2); font-size:14px; margin:4px 0}
 .error-txt{color:var(--rojo); font-size:14px; white-space:pre-line}
@@ -52,11 +57,11 @@ body{font-family:"Inter","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
 .acceso-pie{color:#8E7377; font-size:12px; margin-top:24px}
 .acceso-copy{color:#6E5457; font-size:11px; margin-top:10px}
 
-/* Pie de pagina. Va detras de la barra inferior del formulario, por eso el
-   margen extra: en el formulario la barra de botones lo taparia. */
-.pie-copy{background:var(--marino); color:#C4A9AC; text-align:center; font-size:12px;
-  padding:14px 16px; margin-top:28px}
-.pie-copy.con-barra{margin-bottom:76px}
+/* Pie de pagina: discreto y siempre al final. En el formulario la barra fija
+   de botones lo taparia, por eso el margen extra. */
+.pie-copy{flex:none; background:var(--marino); color:#9C8386; text-align:center;
+  font-size:11px; letter-spacing:.02em; padding:11px 16px}
+.pie-copy.con-barra{margin-bottom:74px}
 
 /* ---------- Barra ---------- */
 .barra{position:sticky; top:0; z-index:40; display:flex; justify-content:space-between;
@@ -76,8 +81,8 @@ body{font-family:"Inter","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
 .icono{background:rgba(255,255,255,.12); color:#fff; border:0; width:40px; height:40px;
   border-radius:8px; font-size:19px; cursor:pointer; flex:none}
 
-main{max-width:1180px; margin:0 auto; padding:18px 16px 24px}
-.centro{display:flex; flex-direction:column; align-items:center; justify-content:center;
+main{flex:1 0 auto; width:100%; max-width:1180px; margin:0 auto; padding:18px 16px 24px}
+.centro{flex:1 0 auto; display:flex; flex-direction:column; align-items:center; justify-content:center;
   min-height:60vh; gap:14px; text-align:center; padding:24px}
 .spinner{width:34px;height:34px;border:3px solid #D8DBE1;border-top-color:var(--amarillo);
   border-radius:50%;animation:giro .8s linear infinite}
