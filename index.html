@@ -50,6 +50,13 @@ body{font-family:"Inter","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
 .acceso-boton{width:100%; margin-top:6px; font-size:17px}
 .acceso-error{color:#FFB4AB; font-size:14px; margin:10px 0; min-height:20px; white-space:pre-line}
 .acceso-pie{color:#8E7377; font-size:12px; margin-top:24px}
+.acceso-copy{color:#6E5457; font-size:11px; margin-top:10px}
+
+/* Pie de pagina. Va detras de la barra inferior del formulario, por eso el
+   margen extra: en el formulario la barra de botones lo taparia. */
+.pie-copy{background:var(--marino); color:#C4A9AC; text-align:center; font-size:12px;
+  padding:14px 16px; margin-top:28px}
+.pie-copy.con-barra{margin-bottom:76px}
 
 /* ---------- Barra ---------- */
 .barra{position:sticky; top:0; z-index:40; display:flex; justify-content:space-between;
@@ -69,7 +76,7 @@ body{font-family:"Inter","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
 .icono{background:rgba(255,255,255,.12); color:#fff; border:0; width:40px; height:40px;
   border-radius:8px; font-size:19px; cursor:pointer; flex:none}
 
-main{max-width:1180px; margin:0 auto; padding:18px 16px calc(96px + env(safe-area-inset-bottom))}
+main{max-width:1180px; margin:0 auto; padding:18px 16px 24px}
 .centro{display:flex; flex-direction:column; align-items:center; justify-content:center;
   min-height:60vh; gap:14px; text-align:center; padding:24px}
 .spinner{width:34px;height:34px;border:3px solid #D8DBE1;border-top-color:var(--amarillo);
@@ -256,6 +263,7 @@ table.datos th{background:#F2F3F6; font-size:12px; text-transform:uppercase; let
       <button id="btnAcceso" type="submit" class="btn btn-primario acceso-boton">Ingresar</button>
     </form>
     <p class="acceso-pie">Si olvido su clave, pidasela al administrador.</p>
+    <p class="acceso-copy">&copy;Copyright 2026 Yuval SPA. Todos los derechos reservados</p>
   </div>
 </div>
 
@@ -280,6 +288,11 @@ table.datos th{background:#F2F3F6; font-size:12px; text-transform:uppercase; let
 </div>
 
 <main id="app" class="oculto"></main>
+
+<footer id="pieCopy" class="pie-copy oculto">
+  &copy;Copyright 2026 Yuval SPA. Todos los derechos reservados
+</footer>
+
 <div id="barraInferior" class="barra-inferior oculto"></div>
 <div id="modal" class="modal oculto"></div>
 
@@ -346,6 +359,12 @@ function $(id){ return document.getElementById(id); }
 function val(id){ var e=$(id); return e ? String(e.value||'').trim() : ''; }
 function mostrar(id){ var e=$(id); if(e) e.classList.remove('oculto'); }
 function ocultar(id){ var e=$(id); if(e) e.classList.add('oculto'); }
+/* La barra de botones del formulario es fija: cuando esta, el pie de pagina
+   necesita margen para no quedar debajo. */
+function ocultarBarraInferior(){
+  ocultar('barraInferior');
+  var p=$('pieCopy'); if(p) p.classList.remove('con-barra');
+}
 function esc(t){
   return String(t===null||t===undefined?'':t)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
@@ -392,7 +411,8 @@ function borrarLocal(k){ try{ localStorage.removeItem(k); }catch(e){} }
 
 function forzarAcceso(mensaje){
   S.token=null; borrarLocal(CLAVE_TOKEN);
-  ocultar('cargando'); ocultar('app'); ocultar('barra'); ocultar('barraInferior');
+  ocultar('cargando'); ocultar('app'); ocultar('barra'); ocultarBarraInferior();
+  ocultar('pieCopy');
   mostrar('acceso');
   var e=$('accesoError');
   if(mensaje){ e.textContent=mensaje; e.classList.remove('oculto'); }
@@ -439,7 +459,7 @@ function arrancarSesion(){
       try{ S.catalogos = JSON.parse(leerLocal(CLAVE_CATALOGO)||'null'); }catch(e){ S.catalogos=null; }
       if(!S.catalogos){ borrarLocal(CLAVE_VERSION); return arrancarSesion(); }
     }
-    ocultar('cargando'); mostrar('barra'); mostrar('app');
+    ocultar('cargando'); mostrar('barra'); mostrar('app'); mostrar('pieCopy');
     $('barraSub').textContent = S.usuario.NOMBRE + ' · ' + S.usuario.PERFIL;
     verDelegaciones();
   }, function(e){ forzarAcceso(e.message||String(e)); });
@@ -506,7 +526,7 @@ function cerrarModal(){ var m=$('modal'); m.classList.add('oculto'); m.innerHTML
    VISTA 1 · Delegaciones
    ========================================================================= */
 function verDelegaciones(){
-  S.vista='delegaciones'; S.delActual=null; ocultar('barraInferior');
+  S.vista='delegaciones'; S.delActual=null; ocultarBarraInferior();
   llamar('listarDelegaciones',[], function(lista){
     S.delegaciones=lista;
     var admin = S.usuario.PERFIL==='ADMIN';
@@ -555,7 +575,7 @@ function guardarDelegacionUI(id){
    VISTA 2 · Emergencias de la delegacion
    ========================================================================= */
 function verEmergencias(idDelegacion){
-  S.vista='emergencias'; S.delActual=idDelegacion; ocultar('barraInferior');
+  S.vista='emergencias'; S.delActual=idDelegacion; ocultarBarraInferior();
   llamar('listarEmergencias',[idDelegacion, S.filtroEstado||''], function(lista){
     S.emergencias=lista;
     var estados=['','BORRADOR','ENVIADA','OBSERVADA','APROBADA','CERRADA'];
@@ -685,6 +705,7 @@ function pintarBarraInferior(){
   else if(S.editable) html += '<button class="btn btn-accion" onclick="guardarEmergenciaUI(true)">Enviar</button>';
   b.innerHTML=html;
   b.classList.remove('oculto');
+  var p=$('pieCopy'); if(p) p.classList.add('con-barra');
 }
 
 function ro(){ return S.editable ? '' : ' disabled'; }
@@ -737,7 +758,8 @@ function pintarPaso(){
       + '<div class="campos" style="margin-top:16px">'
       + '<label>Actuacion<select id="fACTUACION"'+ro()+'>'+opcionesSelect(c.actuacion,f.ACTUACION)+'</select></label>'
       + '<label>Complejidad<select id="fCOMPLEJIDAD"'+ro()+'>'+opcionesSelect(c.complejidad,f.COMPLEJIDAD)+'</select></label>'
-      + '<label>Tipo de falla<select id="fTIPO_FALLA"'+ro()+'>'+opcionesSelect(c.tipoFalla,f.TIPO_FALLA)+'</select></label>'
+      /* Tipo de falla no se pide en terreno: lo clasifica Control de Gestion.
+         La columna sigue existiendo en la planilla, en blanco. */
       + '<label class="ancho">Descripcion del trabajo'
       + '<textarea id="fTIPO_TRABAJO" placeholder="REEMPLAZO DE RED BT DESDE PL 669765 HASTA PL 669770"'+ro()+'>'+esc(f.TIPO_TRABAJO)+'</textarea></label>'
       + '</div>';
@@ -745,12 +767,18 @@ function pintarPaso(){
   else if(S.paso===5){
     p.innerHTML = '<h2>5 · Recursos</h2>'
       + '<div class="campos">'
-      + '<label>Jefe de faena<select id="fJEFE_FAENA"'+ro()+'>'+opcionesSelect(c.jefes,f.JEFE_FAENA)+'</select></label>'
-      + '<label>Supervisor<select id="fSUPERVISOR"'+ro()+'>'+opcionesSelect(c.supervisores,f.SUPERVISOR)+'</select></label>'
+      /* Supervisor y moviles van como texto libre con sugerencias: la rotacion
+         de supervisores es alta y una lista cerrada obliga a esperar al
+         administrador para poder registrar. */
+      + '<label>Jefe de faena<input id="fJEFE_FAENA" list="lstJefes" value="'+esc(f.JEFE_FAENA)+'"'+ro()+'></label>'
+      + '<label>Supervisor<input id="fSUPERVISOR" list="lstSupervisores" placeholder="escriba el nombre" value="'+esc(f.SUPERVISOR)+'"'+ro()+'></label>'
       + '<label>Moviles<input id="fN_MOVILES" placeholder="M 127 C 125" value="'+esc(f.N_MOVILES)+'"'+ro()+'></label>'
       + '</div>'
+      + '<datalist id="lstJefes">'+(c.jefes||[]).map(function(j){return '<option value="'+esc(j)+'">';}).join('')+'</datalist>'
+      + '<datalist id="lstSupervisores">'+(c.supervisores||[]).map(function(s){return '<option value="'+esc(s)+'">';}).join('')+'</datalist>'
       + '<h3>Materiales</h3>'
-      + '<p class="tenue">Busque por codigo o por nombre. No es obligatorio: hay trabajos sin material.</p>'
+      + '<p class="tenue">Busque por codigo o por nombre. Nada de esto es obligatorio: puede enviar la '
+      + 'emergencia sin materiales, o dejar R/I y panol en blanco.</p>'
       + (S.editable ? '<input id="busMat" placeholder="alambre, prensa, 16101..." oninput="buscarMaterial()">'
         + '<div id="resMat" class="resultados oculto"></div>' : '')
       + '<div id="listaMat" class="lista-items"></div>'
@@ -894,16 +922,42 @@ function elegirActividad(i){
 
 /* ---------- Paso 5: materiales ---------- */
 var tempoMat=null;
+/**
+ * Busca por glosa o por codigo.
+ *
+ * Antes exigia 3 caracteres siempre, y por eso los codigos cortos no
+ * aparecian: buscar "59" (ALAMBRE 16MM2 CU DESN) no devolvia nada, mientras
+ * que los de tres digitos o mas si. Ahora, si lo escrito son solo numeros,
+ * basta con un caracter y se busca el codigo exacto primero.
+ */
 function buscarMaterial(){
   clearTimeout(tempoMat);
   tempoMat = setTimeout(function(){
     var q = val('busMat').toLowerCase();
     var caja=$('resMat');
-    if(q.length<3){ caja.classList.add('oculto'); return; }
-    var lista = S.catalogos.materiales;
-    var r = lista.filter(function(m){
-      return m.gl.toLowerCase().indexOf(q)>=0 || String(m.cod).indexOf(q)>=0;
-    }).slice(0,30);
+    var esCodigo = /^\d+$/.test(q);
+    if(!q.length || (!esCodigo && q.length<3)){ caja.classList.add('oculto'); return; }
+
+    var lista = S.catalogos.materiales, r;
+    if(esCodigo){
+      // Primero el codigo exacto, despues los que empiezan igual y al final
+      // los que lo contienen. Sin deduplicar, "59" traia dos veces el 5900.
+      var vistos = {};
+      var unicos = function(sub){
+        return sub.filter(function(m){
+          if(vistos[m.cod]) return false;
+          vistos[m.cod] = true; return true;
+        });
+      };
+      r = unicos(lista.filter(function(m){ return String(m.cod)===q; }))
+        .concat(unicos(lista.filter(function(m){ return String(m.cod).indexOf(q)===0; })))
+        .concat(unicos(lista.filter(function(m){
+          return String(m.cod).indexOf(q)>0 || m.gl.toLowerCase().indexOf(q)>=0; })))
+        .slice(0,30);
+    } else {
+      r = lista.filter(function(m){ return m.gl.toLowerCase().indexOf(q)>=0; }).slice(0,30);
+    }
+
     caja.innerHTML = r.length
       ? r.map(function(m){
           return '<div class="resultado" onclick="agregarMaterial(\''+esc(m.cod)+'\')">'
@@ -920,8 +974,10 @@ function agregarMaterial(cod){
   }
   var m = S.catalogos.materiales.filter(function(x){ return String(x.cod)===String(cod); })[0];
   if(!m) return;
-  S.materiales.push({ COD_MATERIAL:m.cod, DESCRIPCION:m.gl, UNIDAD:m.un,
-                      CANTIDAD:1, R_I:'I', OBSERVACIONES:'', PANOL:'' });
+  // El material recien agregado va arriba: es el que hay que completar, y en
+  // el telefono el fondo de la lista queda fuera de pantalla.
+  S.materiales.unshift({ COD_MATERIAL:m.cod, DESCRIPCION:m.gl, UNIDAD:m.un,
+                         CANTIDAD:1, R_I:'', OBSERVACIONES:'', PANOL:'' });
   recordarMaterial(m.cod);
   $('busMat').value=''; $('resMat').classList.add('oculto');
   pintarMateriales();
@@ -949,10 +1005,13 @@ function pintarMateriales(){
       + '<div class="item-campos">'
       + '<label>Cantidad<input type="number" min="0" step="0.01" value="'+esc(m.CANTIDAD)+'" oninput="S.materiales['+i+'].CANTIDAD=this.value"'+ro()+'></label>'
       + '<label>Unidad<select onchange="S.materiales['+i+'].UNIDAD=this.value"'+ro()+'>'+opcionesSelect(S.catalogos.unidades,m.UNIDAD,'—')+'</select></label>'
+      /* R/I y panol son opcionales: se pueden dejar en blanco sin que eso
+         impida enviar la emergencia ni descargar la Orden de Trabajo. */
       + '<label>R / I<select onchange="S.materiales['+i+'].R_I=this.value"'+ro()+'>'
+      + '<option value=""'+(m.R_I?'':' selected')+'>—</option>'
       + '<option value="I"'+(m.R_I==='I'?' selected':'')+'>Instalado</option>'
       + '<option value="R"'+(m.R_I==='R'?' selected':'')+'>Retirado</option></select></label>'
-      + '<label>Panol<select onchange="S.materiales['+i+'].PANOL=this.value"'+ro()+'>'+opcionesSelect(S.catalogos.panoles,m.PANOL)+'</select></label>'
+      + '<label>Panol<select onchange="S.materiales['+i+'].PANOL=this.value"'+ro()+'>'+opcionesSelect(S.catalogos.panoles,m.PANOL,'—')+'</select></label>'
       + '<label style="grid-column:1/-1">Observaciones o serie<input value="'+esc(m.OBSERVACIONES)+'" oninput="S.materiales['+i+'].OBSERVACIONES=this.value"'+ro()+'></label>'
       + '</div></div>';
   }).join('');
@@ -968,7 +1027,7 @@ function resumenHtml(){
     ['Evidencia EPR', f.EVIDENCIA_EPR], ['Evidencia REC', f.EVIDENCIA_REC],
     ['Direccion', f.DIRECCION], ['Coordenadas', f.COORDENADAS],
     ['Llegada', f.LLEGADA], ['Inicio', f.INICIO], ['Termino', f.TERMINO], ['Horas trabajadas', f.HT],
-    ['Actuacion', f.ACTUACION], ['Complejidad', f.COMPLEJIDAD], ['Tipo de falla', f.TIPO_FALLA],
+    ['Actuacion', f.ACTUACION], ['Complejidad', f.COMPLEJIDAD],
     ['Jefe de faena', f.JEFE_FAENA], ['Supervisor', f.SUPERVISOR], ['Moviles', f.N_MOVILES],
     ['Materiales', S.materiales.length + ' linea' + (S.materiales.length===1?'':'s')]
   ];
@@ -1209,7 +1268,7 @@ function enviarAlServidor(enviar, luego){
    VISTA 4 · Administracion
    ========================================================================= */
 function verAdmin(){
-  S.vista='admin'; ocultar('barraInferior');
+  S.vista='admin'; ocultarBarraInferior();
   var pestanas = [['revision','Revision'],['usuarios','Usuarios'],['equipos','Equipos'],
                   ['exportar','Exportar'],['indicadores','Indicadores'],['sistema','Sistema']];
   var html = '<div class="encabezado-vista"><div><h1>Administracion</h1></div>'
@@ -1239,8 +1298,10 @@ function adminRevision(){
           return '<div class="tarjeta ENVIADA" onclick="S.delActual=\''+esc(e.DELEGACION)+'\';abrirEmergencia(\''+esc(e.ID_EMERGENCIA)+'\')">'
             + '<div class="tarjeta-titulo"><span>'+esc(e.ID_EMERGENCIA)+'</span>'
             + '<span class="insignia ENVIADA">'+esc(e.DELEGACION)+'</span></div>'
-            + '<div class="tarjeta-datos"><b>'+esc(e.FECHA)+'</b> · '+esc(e.TIPO_FALLA)
-            + '<br>'+esc(e.DIRECCION)+'<br>'+esc(e.JEFE_FAENA)+'</div></div>';
+            + '<div class="tarjeta-datos"><b>'+esc(e.FECHA||'sin fecha')+'</b>'
+            + (e.N_DOCUMENTO ? ' · OT '+esc(e.N_DOCUMENTO) : '')
+            + '<br>'+esc(e.DIRECCION||'(sin direccion)')
+            + (e.JEFE_FAENA ? '<br>'+esc(e.JEFE_FAENA) : '')+'</div></div>';
         }).join('') + '</div>';
   });
 }
@@ -1341,28 +1402,54 @@ function quitarDelEquipo(id, persona){
 
 function adminExportar(){
   var opciones = S.delegaciones.map(function(d){ return d.ID_DELEGACION; });
-  $('panelAdmin').innerHTML = '<h2>Exportar a la planilla</h2>'
-    + '<p class="ayuda">El archivo trae las 26 columnas de REGISTRO EMERGENCIAS 2026, en el mismo orden. '
-    + 'Las que la app no llena (EDP ASIG, PLANO, RECEP INF, %, MONTO) salen vacias a proposito.</p>'
+  $('panelAdmin').innerHTML = '<h2>Exportar</h2>'
     + '<div class="campos">'
     + '<label>Desde<input id="exDesde" type="date"></label>'
     + '<label>Hasta<input id="exHasta" type="date"></label>'
     + '<label>Delegacion<select id="exDel">'+opcionesSelect(opciones,'','Todas')+'</select></label>'
-    + '<label>Solo aprobadas<select id="exApr">'+opcionesSelect([{valor:'',texto:'No, todas'},{valor:'1',texto:'Si'}],'','')+'</select></label>'
     + '</div>'
-    + '<div class="fila fin"><button class="btn btn-primario" onclick="exportarCsv()">Descargar CSV</button></div>';
+    + '<p class="tenue">Si deja las fechas en blanco, exporta todo.</p>'
+
+    + '<h3>Base de datos completa</h3>'
+    + '<p class="ayuda">Descarga dos archivos: uno con todas las columnas de cada emergencia '
+    + '(incluidos ID, estado, autor, moviles y enlaces a Drive) y otro con el detalle de materiales, '
+    + 'una fila por linea. Sirven para analizar en Excel y se cruzan por ID_EMERGENCIA.</p>'
+    + '<div class="fila"><button class="btn btn-primario" onclick="exportarBd()">Descargar base de datos</button></div>'
+
+    + '<h3>Para pegar en la planilla</h3>'
+    + '<p class="ayuda">Las 26 columnas de REGISTRO EMERGENCIAS 2026, en el mismo orden. '
+    + 'Las que la app no llena (EDP ASIG, PLANO, RECEP INF, %, MONTO) salen vacias a proposito.</p>'
+    + '<div class="fila"><label style="flex:1;max-width:220px">Solo aprobadas'
+    + '<select id="exApr">'+opcionesSelect([{valor:'',texto:'No, todas'},{valor:'1',texto:'Si'}],'','')+'</select></label>'
+    + '<button class="btn btn-secundario" onclick="exportarCsv()">Descargar CSV planilla</button></div>';
 }
+
+function bajarCsv(nombre, csv){
+  var url = URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  var a=document.createElement('a'); a.href=url; a.download=nombre;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function(){ URL.revokeObjectURL(url); },5000);
+}
+
 function exportarCsv(){
   avisar('Preparando el archivo...');
   llamar('exportarConsolidado',[val('exDesde'),val('exHasta'),val('exDel'),val('exApr')==='1'],
     function(r){
       if(!r.filas) return avisar('No hay emergencias en ese rango.','error');
-      var url = URL.createObjectURL(new Blob([r.csv],{type:'text/csv;charset=utf-8'}));
-      var a=document.createElement('a'); a.href=url; a.download=r.nombre;
-      document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(function(){ URL.revokeObjectURL(url); },4000);
+      bajarCsv(r.nombre, r.csv);
       avisar(r.filas+' filas exportadas.','ok');
     });
+}
+
+function exportarBd(){
+  avisar('Preparando la base de datos...');
+  llamar('exportarBaseDatos',[val('exDesde'),val('exHasta'),val('exDel')], function(r){
+    if(!r.emergencias.filas) return avisar('No hay emergencias en ese rango.','error');
+    bajarCsv(r.emergencias.nombre, r.emergencias.csv);
+    // Los navegadores bloquean dos descargas seguidas si van muy pegadas.
+    setTimeout(function(){ bajarCsv(r.materiales.nombre, r.materiales.csv); }, 900);
+    avisar(r.emergencias.filas+' emergencias y '+r.materiales.filas+' materiales.','ok');
+  });
 }
 
 function adminIndicadores(){
