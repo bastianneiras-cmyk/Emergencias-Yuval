@@ -28,7 +28,12 @@
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
-html{min-height:100%}
+/* overscroll-behavior contain: corta el "pull to refresh" propio del navegador
+   para que no se sume al nuestro. Instalada en la pantalla de inicio ese gesto
+   nativo no existe, asi que el deslizar para actualizar lo maneja la app y
+   funciona igual en las dos formas de abrirla. */
+html{min-height:100%; overscroll-behavior-y:contain}
+body{overscroll-behavior-y:contain}
 /* Columna flexible de alto completo: con poco contenido el pie queda pegado
    abajo en vez de aparecer a media pantalla, y con mucho contenido baja
    normalmente al final. */
@@ -174,6 +179,12 @@ textarea{min-height:100px; resize:vertical}
 .opcion.activa{border-color:var(--amarillo); background:#FFF8DA}
 .ayuda{background:#EAF1F9; border-left:4px solid var(--azul); padding:12px;
   border-radius:6px; font-size:14px; margin:0 0 14px}
+/* Confirmacion de lo que quedo seleccionado en un buscador. */
+.elegido{display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  background:#DCEFE4; border-left:4px solid var(--verde); border-radius:6px;
+  padding:10px 12px; margin-top:10px; font-size:14px}
+.elegido b{display:block; width:100%; font-size:11px; text-transform:uppercase;
+  letter-spacing:.06em; color:var(--verde)}
 .aviso{background:#FFF4CC; border-left:4px solid var(--amarillo-osc); padding:12px;
   border-radius:6px; font-size:14px; margin:0 0 14px}
 .alerta{background:#FBDDDC; border-left:4px solid var(--rojo); padding:12px;
@@ -223,6 +234,18 @@ table.datos th{background:#F2F3F6; font-size:12px; text-transform:uppercase; let
   padding:10px 16px calc(10px + env(safe-area-inset-bottom)); background:rgba(238,242,248,.96);
   border-top:1px solid #DEE1E7; backdrop-filter:blur(6px)}
 .barra-inferior .btn{flex:1}
+
+/* Indicador de "deslizar para actualizar". Vive bajo la barra superior y
+   asoma a medida que se tira hacia abajo. */
+.ptr{position:fixed; left:0; right:0; top:0; height:58px; z-index:35;
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  font-size:13px; font-weight:600; color:var(--tinta-2);
+  transform:translateY(-64px); transition:transform .16s ease-out;
+  pointer-events:none}
+.ptr.listo{color:var(--verde)}
+.ptr .rueda{width:18px; height:18px; border:2px solid #C9CDD5;
+  border-top-color:var(--amarillo); border-radius:50%}
+.ptr.girando .rueda{animation:giro .8s linear infinite}
 
 .aviso-flotante{position:fixed; left:50%; transform:translateX(-50%); bottom:88px; z-index:80;
   background:var(--marino); color:#fff; padding:12px 18px; border-radius:999px; font-size:14px;
@@ -287,6 +310,8 @@ table.datos th{background:#F2F3F6; font-size:12px; text-transform:uppercase; let
   </div>
 </div>
 
+<div id="ptr" class="ptr"><span class="rueda"></span><span id="ptrTexto">Deslice para actualizar</span></div>
+
 <div id="cargando" class="centro">
   <div class="spinner"></div>
   <p class="tenue">Cargando...</p>
@@ -317,7 +342,8 @@ var S = {
   limites:{maxMateriales:30},
   delActual:null, emergencias:[], emgActual:null, form:null, materiales:[],
   adjuntos:[], paso:1, filtroEstado:'', editable:true, guardando:false,
-  vista:'delegaciones', pestanaAdmin:'revision'
+  vista:'delegaciones', pestanaAdmin:'revision',
+  periodo:'mes', rango:{desde:'',hasta:''}
 };
 var CLAVE_TOKEN     = 'yuval_emg_token';
 var CLAVE_CATALOGO  = 'yuval_emg_catalogo';
@@ -402,7 +428,85 @@ window.addEventListener('load', function(){
   window.addEventListener('offline', actualizarRed);
   S.token = leerLocal(CLAVE_TOKEN);
   if(S.token) arrancarSesion(); else forzarAcceso();
+  iniciarDeslizarParaActualizar();
 });
+
+/* =========================================================================
+   Deslizar para actualizar
+   ------------------------------------------------------------------------
+   Agregada a la pantalla de inicio, la app corre en modo independiente y ahi
+   el navegador no ofrece el gesto nativo: hay que implementarlo. Los oyentes
+   son pasivos a proposito (no se llama preventDefault), asi el desplazamiento
+   normal no pierde fluidez en telefonos lentos.
+
+   Queda desactivado dentro del formulario: recargar ahi significaria perder lo
+   que el jefe de faena lleva escrito y no ha guardado.
+   ========================================================================= */
+var PTR = { activo:false, y0:0, distancia:0, refrescando:false };
+var PTR_UMBRAL = 70;
+
+function iniciarDeslizarParaActualizar(){
+  var ind = $('ptr'), txt = $('ptrTexto');
+  if(!ind) return;
+
+  var mover = function(y){
+    ind.style.transform = 'translateY(' + (Math.min(y, 95) - 64) + 'px)';
+  };
+
+  document.addEventListener('touchstart', function(ev){
+    if(PTR.refrescando || S.vista==='form' || !S.token) return;
+    if(window.scrollY > 0 || ev.touches.length !== 1) return;
+    PTR.activo = true; PTR.y0 = ev.touches[0].clientY; PTR.distancia = 0;
+  }, {passive:true});
+
+  document.addEventListener('touchmove', function(ev){
+    if(!PTR.activo) return;
+    var d = ev.touches[0].clientY - PTR.y0;
+    if(d <= 0 || window.scrollY > 0){ PTR.distancia = 0; mover(0); return; }
+    PTR.distancia = d;
+    mover(d * 0.55);
+    var listo = d >= PTR_UMBRAL;
+    ind.classList.toggle('listo', listo);
+    txt.textContent = listo ? 'Suelte para actualizar' : 'Deslice para actualizar';
+  }, {passive:true});
+
+  document.addEventListener('touchend', function(){
+    if(!PTR.activo) return;
+    var soltado = PTR.distancia;
+    PTR.activo = false; PTR.distancia = 0;
+    if(soltado >= PTR_UMBRAL) refrescarVista();
+    else { ind.classList.remove('listo'); mover(0); }
+  }, {passive:true});
+
+  document.addEventListener('touchcancel', function(){
+    PTR.activo = false; PTR.distancia = 0;
+    ind.classList.remove('listo'); mover(0);
+  }, {passive:true});
+}
+
+/** Vuelve a pedir los datos de la vista actual, sin recargar la pagina. */
+function refrescarVista(){
+  var ind = $('ptr'), txt = $('ptrTexto');
+  PTR.refrescando = true;
+  ind.classList.add('girando'); ind.classList.remove('listo');
+  txt.textContent = 'Actualizando...';
+  ind.style.transform = 'translateY(0)';
+
+  var terminar = function(){
+    PTR.refrescando = false;
+    ind.classList.remove('girando');
+    ind.style.transform = 'translateY(-64px)';
+    txt.textContent = 'Deslice para actualizar';
+  };
+
+  if(S.vista==='emergencias')   verEmergencias(S.delActual);
+  else if(S.vista==='admin')    verAdmin();
+  else                          verDelegaciones();
+
+  // Las vistas se pintan al volver del servidor; 900 ms alcanza para que el
+  // indicador no desaparezca antes de que se vea el cambio.
+  setTimeout(terminar, 900);
+}
 
 function actualizarRed(){
   var c = $('chipRed'); if(!c) return;
@@ -579,27 +683,83 @@ function guardarDelegacionUI(id){
 /* =========================================================================
    VISTA 2 · Emergencias de la delegacion
    ========================================================================= */
+/* =========================================================================
+   Periodo
+   ------------------------------------------------------------------------
+   Por defecto se muestra el mes en curso. Una delegacion como Rancagua junta
+   unas 50 emergencias al mes: sin acotar, en pocos meses la lista se vuelve
+   imposible de recorrer en el telefono.
+   ========================================================================= */
+function iso(d){
+  return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);
+}
+function rangoPeriodo(){
+  var h=new Date(), a=h.getFullYear(), m=h.getMonth();
+  if(S.periodo==='mes')    return { desde:iso(new Date(a,m,1)),    hasta:iso(new Date(a,m+1,0)) };
+  if(S.periodo==='mes-1')  return { desde:iso(new Date(a,m-1,1)),  hasta:iso(new Date(a,m,0)) };
+  if(S.periodo==='3meses') return { desde:iso(new Date(a,m-2,1)),  hasta:iso(new Date(a,m+1,0)) };
+  if(S.periodo==='rango')  return { desde:S.rango.desde, hasta:S.rango.hasta };
+  return { desde:'', hasta:'' };   // todas
+}
+function etiquetaPeriodo(){
+  var MES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto',
+           'septiembre','octubre','noviembre','diciembre'];
+  var h=new Date();
+  if(S.periodo==='mes')    return MES[h.getMonth()]+' '+h.getFullYear();
+  if(S.periodo==='mes-1'){ var p=new Date(h.getFullYear(),h.getMonth()-1,1);
+                           return MES[p.getMonth()]+' '+p.getFullYear(); }
+  if(S.periodo==='3meses') return 'ultimos 3 meses';
+  if(S.periodo==='rango'){ var r=rangoPeriodo();
+                           return (r.desde||'inicio')+' a '+(r.hasta||'hoy'); }
+  return 'todo el historico';
+}
+function cambiarPeriodo(p){
+  S.periodo=p;
+  if(p!=='rango') verEmergencias(S.delActual);
+  else { S.rango={desde:'',hasta:''}; verEmergencias(S.delActual); }
+}
+function aplicarRango(){
+  S.periodo='rango';
+  S.rango={ desde:val('perDesde'), hasta:val('perHasta') };
+  verEmergencias(S.delActual);
+}
+
 function verEmergencias(idDelegacion){
   S.vista='emergencias'; S.delActual=idDelegacion; ocultarBarraInferior();
-  llamar('listarEmergencias',[idDelegacion, S.filtroEstado||''], function(lista){
+  var r = rangoPeriodo();
+  llamar('listarEmergencias',[idDelegacion, S.filtroEstado||'', r.desde, r.hasta], function(lista){
     S.emergencias=lista;
     var estados=['','BORRADOR','ENVIADA','OBSERVADA','APROBADA','CERRADA'];
+    var periodos=[['mes','Este mes'],['mes-1','Mes anterior'],['3meses','Ultimos 3 meses'],
+                  ['rango','Rango...'],['','Todas']];
     var html = '<div class="encabezado-vista"><div>'
       + '<h1>'+esc(idDelegacion)+'</h1>'
-      + '<p class="tenue">'+lista.length+' emergencia'+(lista.length===1?'':'s')+'</p></div>'
+      + '<p class="tenue">'+lista.length+' emergencia'+(lista.length===1?'':'s')
+      + ' · '+esc(etiquetaPeriodo())+'</p></div>'
       + '<div class="acciones">'
       + '<button class="btn btn-secundario" onclick="verDelegaciones()">Volver</button>'
       + '<button class="btn btn-primario" onclick="nuevaEmergencia()">Nueva emergencia</button>'
       + '</div></div>'
+      + '<div class="filtros">' + periodos.map(function(p){
+          return '<button class="filtro'+(S.periodo===p[0]?' activo':'')+'" '
+               + 'onclick="cambiarPeriodo(\''+p[0]+'\')">'+p[1]+'</button>';
+        }).join('') + '</div>'
+      + (S.periodo==='rango'
+          ? '<div class="fila" style="margin-bottom:12px">'
+            + '<label style="flex:1;min-width:140px">Desde<input id="perDesde" type="date" value="'+esc(S.rango.desde)+'"></label>'
+            + '<label style="flex:1;min-width:140px">Hasta<input id="perHasta" type="date" value="'+esc(S.rango.hasta)+'"></label>'
+            + '<button class="btn btn-secundario btn-mini" onclick="aplicarRango()">Aplicar</button></div>'
+          : '')
       + '<div class="filtros">' + estados.map(function(e){
           return '<button class="filtro'+(S.filtroEstado===e?' activo':'')+'" '
                + 'onclick="S.filtroEstado=\''+e+'\';verEmergencias(\''+esc(idDelegacion)+'\')">'
-               + (e||'Todas')+'</button>';
+               + (e||'Todos los estados')+'</button>';
         }).join('') + '</div>';
 
     if(!lista.length){
-      html += '<div class="vacio"><p class="vacio-titulo">Sin emergencias registradas</p>'
-            + '<p class="tenue">Toque «Nueva emergencia» para empezar.</p></div>';
+      html += '<div class="vacio"><p class="vacio-titulo">Sin emergencias en '+esc(etiquetaPeriodo())+'</p>'
+            + '<p class="tenue">Cambie el periodo arriba para buscar las anteriores, '
+            + 'o toque «Nueva emergencia» para empezar una.</p></div>';
     } else {
       html += '<div class="grilla">' + lista.map(function(e){
         return '<div class="tarjeta '+esc(e.ESTADO)+'" onclick="abrirEmergencia(\''+esc(e.ID_EMERGENCIA)+'\')">'
@@ -627,7 +787,7 @@ function formVacio(){
     ID_EMERGENCIA:'', DELEGACION:S.delActual, FECHA:hoy(), SDI:'', N_DOCUMENTO:'',
     EVIDENCIA_EPR:'', EVIDENCIA_REC:'', DIRECCION:'', COORDENADAS:'',
     LLEGADA:'', INICIO:'', TERMINO:'', ACTUACION:'', COMPLEJIDAD:'',
-    TIPO_TRABAJO:'', TIPO_FALLA:'', JEFE_FAENA:'', SUPERVISOR:'', N_MOVILES:'',
+    TIPO_TRABAJO:'', TIPO_FALLA:'', ACTIVIDAD:'', JEFE_FAENA:'', SUPERVISOR:'', N_MOVILES:'',
     OBSERVACIONES:'', ESTADO:'BORRADOR'
   };
 }
@@ -740,7 +900,10 @@ function pintarPaso(){
       + '</div>'
       + '<h3>Croquis (opcional)</h3>'
       + '<p class="tenue">Una foto del croquis dibujado a mano, o una captura del mapa.</p>'
-      + (S.editable ? '<div class="fila"><input type="file" accept="image/*" capture="environment" id="inCroquis" onchange="subirImagen(this,\'CROQUIS\')"></div>' : '')
+      /* Sin el atributo capture: con el, el telefono abre la camara y no deja
+         elegir una foto que ya se tomo. Ahora el sistema ofrece las dos. */
+      + (S.editable ? '<div class="fila"><input type="file" accept="image/*" id="inCroquis" onchange="subirImagen(this,\'CROQUIS\')"></div>'
+        + '<p class="tenue">Puede sacar la foto en el momento o elegir una de la galeria.</p>' : '')
       + '<div id="previaCroquis">'+previaAdjunto('CROQUIS')+'</div>';
   }
   else if(S.paso===3){
@@ -760,6 +923,7 @@ function pintarPaso(){
       + '<p class="tenue">Al elegirla se completan solos la actuacion y la complejidad.</p>'
       + '<input id="busAct" placeholder="poste, conductor, poda..." oninput="buscarActividad()"'+ro()+'>'
       + '<div id="resAct" class="resultados oculto"></div>'
+      + '<div id="actElegida">'+actividadElegidaHtml()+'</div>'
       + '<div class="campos" style="margin-top:16px">'
       + '<label>Actuacion<select id="fACTUACION"'+ro()+'>'+opcionesSelect(c.actuacion,f.ACTUACION)+'</select></label>'
       + '<label>Complejidad<select id="fCOMPLEJIDAD"'+ro()+'>'+opcionesSelect(c.complejidad,f.COMPLEJIDAD)+'</select></label>'
@@ -915,14 +1079,33 @@ function buscarActividad(){
     caja.classList.remove('oculto');
   }, 180);
 }
+/**
+ * Antes se limpiaba el buscador al elegir, y el campo vacio hacia pensar que
+ * no se habia seleccionado nada. Ahora la actividad elegida queda escrita en
+ * el buscador y ademas se muestra confirmada debajo.
+ */
 function elegirActividad(i){
   var a = S.catalogos.actividades[i]; if(!a) return;
   $('fACTUACION').value = a.tipo;
   $('fCOMPLEJIDAD').value = a.cpx;
   if(!val('fTIPO_TRABAJO')) $('fTIPO_TRABAJO').value = a.act.toUpperCase();
+  S.form.ACTIVIDAD = a.act;
+  $('busAct').value = a.act;
   $('resAct').classList.add('oculto');
-  $('busAct').value='';
-  avisar('Actuacion y complejidad completadas.','ok');
+  $('actElegida').innerHTML = actividadElegidaHtml();
+  avisar('Actividad seleccionada. Actuacion y complejidad completadas.','ok');
+}
+
+function actividadElegidaHtml(){
+  if(!S.form || !S.form.ACTIVIDAD) return '';
+  return '<div class="elegido"><b>Actividad seleccionada</b>'+esc(S.form.ACTIVIDAD)
+    + (S.editable ? '<button class="btn btn-secundario btn-mini" onclick="quitarActividad()">Quitar</button>' : '')
+    + '</div>';
+}
+
+function quitarActividad(){
+  S.form.ACTIVIDAD=''; $('busAct').value='';
+  $('actElegida').innerHTML='';
 }
 
 /* ---------- Paso 5: materiales ---------- */
